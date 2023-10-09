@@ -1,19 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
-import { postSchema } from "./schema";
 import prisma from "@/prisma/client";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import bcrypt from "bcrypt";
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
-   const users = await prisma.user.findMany();
-
-   if (!users) {
-      return NextResponse.json({ message: "There is no user yet in the database." }, { status: 200 });
-   }
-   return NextResponse.json(users);
-}
+const schema = z.object({
+   email: z.string().email(),
+   password: z.string().min(8),
+});
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
    const body = await request.json();
-   const validation = postSchema.safeParse(body);
+   const validation = schema.safeParse(body);
 
    if (!validation.success) {
       return NextResponse.json(validation.error.errors, { status: 400 });
@@ -29,11 +26,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
    const newUser = await prisma.user.create({
       data: {
-         name: body.name,
          email: body.email,
-         password: body.password,
+         password: await bcrypt.hash(body.password, 8),
       },
    });
 
-   return NextResponse.json(newUser, { status: 201 });
+   return NextResponse.json({ email: newUser.email }, { status: 201 });
 }
